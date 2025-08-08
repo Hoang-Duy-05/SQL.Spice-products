@@ -1,113 +1,156 @@
-﻿-- Mục tiêu: tìm những sản phẩm tìm năng để nhập về kinh doanh --
+-- Mục tiêu: tìm những sản phẩm tiềm năng để nhập về kinh doanh --
 
---1/ Sản phẩm có tổng số lượng bán và doanh thu cao nhất từng thương hiệu
-with rank_Total_revenue as (Select 
-Brand,
-[Tên sản phẩm],
-[Tổng doanh số],
-[Tổng lượt bán],
-[Giá bán],
-dense_rank() over(partition by brand order by [Tổng doanh số] desc) as rank_total
-from dhfood)
-
-select *
-from rank_Total_revenue
-where rank_total <= 3
-
---2/ Sản phẩm có số lượng bán và doanh thu cao nhất từng thương hiệu trong 365 ngày gần nhất
-with rank_365_last as (Select 
-Brand,
-[Tên sản phẩm],
-[Doanh số 365 ngày gần nhất],
-[Sản phẩm đã bán trong khoảng 365 ngày gần nhất],
-[Giá bán],
-dense_rank() over(partition by brand order by [Doanh số 365 ngày gần nhất] desc) as rank_365
-from dhfood)
-
-select *
-from rank_365_last
-where rank_365 <= 3
---Nhận xét: Trong 365 ngày qua, các sản phẩm có mức giá từ 25.000 đến 35.000 VND ghi nhận số lượng bán cao. 
---Tuy nhiên, xu hướng tiêu dùng đang cho thấy sự sụt giảm trong việc lựa chọn các sản phẩm cao cấp có giá từ 100.000 đến 500.000 VND, 
---Được phản ánh qua doanh thu giảm của một số thương hiệu sở hữu các sản phẩm giá cao.
+/*--------------------------------------------------------------
+1/ Sản phẩm có tổng số lượng bán và doanh thu cao nhất từng thương hiệu
+--------------------------------------------------------------*/
+WITH rank_Total_revenue AS (
+    SELECT 
+        Brand,
+        [Tên sản phẩm],
+        [Tổng doanh số],
+        [Tổng lượt bán],
+        [Giá bán],
+        DENSE_RANK() OVER (
+            PARTITION BY Brand 
+            ORDER BY [Tổng doanh số] DESC
+        ) AS rank_total
+    FROM dhfood
+)
+SELECT *
+FROM rank_Total_revenue
+WHERE rank_total <= 3;
 
 
---3/ Sản phẩm có tổng số lượng bán và doanh thu cao nhất từng thương hiệu so với sản phẩm trong 365 ngày gần nhất
-with rank_Total_revenue as (Select 
-Brand,
-[Tên sản phẩm],
-[Tổng doanh số],
-[Tổng lượt bán],
-[Giá bán],
-dense_rank() over(partition by brand order by [Tổng doanh số] desc) as rank_total
-from dhfood),
+/*--------------------------------------------------------------
+2/ Sản phẩm có số lượng bán và doanh thu cao nhất từng thương hiệu 
+   trong 365 ngày gần nhất
+--------------------------------------------------------------*/
+WITH rank_365_last AS (
+    SELECT 
+        Brand,
+        [Tên sản phẩm],
+        [Doanh số 365 ngày gần nhất],
+        [Sản phẩm đã bán trong khoảng 365 ngày gần nhất],
+        [Giá bán],
+        DENSE_RANK() OVER (
+            PARTITION BY Brand 
+            ORDER BY [Doanh số 365 ngày gần nhất] DESC
+        ) AS rank_365
+    FROM dhfood
+)
+SELECT *
+FROM rank_365_last
+WHERE rank_365 <= 3;
 
-T_R as (select *
-from rank_Total_revenue
-where rank_total <= 3),
+-- Nhận xét:
+-- Trong 365 ngày qua, các sản phẩm có mức giá từ 25.000–35.000 VND ghi nhận số lượng bán cao. 
+-- Tuy nhiên, xu hướng tiêu dùng đang cho thấy sự sụt giảm ở nhóm sản phẩm cao cấp 
+-- (100.000–500.000 VND), được phản ánh qua doanh thu giảm của một số thương hiệu.
 
-rank_365_last as (Select 
-Brand,
-[Tên sản phẩm],
-[Doanh số 365 ngày gần nhất],
-[Sản phẩm đã bán trong khoảng 365 ngày gần nhất],
-[Giá bán],
-dense_rank() over(partition by brand order by [Doanh số 365 ngày gần nhất] desc) as rank_365
-from dhfood),
 
-T_R_365 as (select *
-from rank_365_last
-where rank_365 <= 3)
+/*--------------------------------------------------------------
+3/ So sánh sản phẩm top doanh thu tổng và trong 365 ngày gần nhất
+--------------------------------------------------------------*/
+WITH rank_Total_revenue AS (
+    SELECT 
+        Brand,
+        [Tên sản phẩm],
+        [Tổng doanh số],
+        [Tổng lượt bán],
+        [Giá bán],
+        DENSE_RANK() OVER (
+            PARTITION BY Brand 
+            ORDER BY [Tổng doanh số] DESC
+        ) AS rank_total
+    FROM dhfood
+),
+T_R AS (
+    SELECT *
+    FROM rank_Total_revenue
+    WHERE rank_total <= 3
+),
+rank_365_last AS (
+    SELECT 
+        Brand,
+        [Tên sản phẩm],
+        [Doanh số 365 ngày gần nhất],
+        [Sản phẩm đã bán trong khoảng 365 ngày gần nhất],
+        [Giá bán],
+        DENSE_RANK() OVER (
+            PARTITION BY Brand 
+            ORDER BY [Doanh số 365 ngày gần nhất] DESC
+        ) AS rank_365
+    FROM dhfood
+),
+T_R_365 AS (
+    SELECT *
+    FROM rank_365_last
+    WHERE rank_365 <= 3
+)
+SELECT 
+    T_R.Brand,
+    T_R.[Tên sản phẩm]  AS Tên_sản_phẩm_total,
+    T_R_365.[Tên sản phẩm] AS Tên_sản_phẩm_365,
+    T_R.[Giá bán]
+FROM T_R
+FULL JOIN T_R_365
+    ON  T_R.rank_total = T_R_365.rank_365
+    AND T_R.Brand = T_R_365.Brand
+ORDER BY Brand, [Giá bán] DESC;
 
-select 
-T_R.brand,
-T_R.[Tên sản phẩm] as Tên_sản_phẩm_total,
-T_R_365.[Tên sản phẩm] as Tên_sản_phẩm_365,
-T_R.[Giá bán]
-from T_R
-full join T_R_365
-on T_R.rank_total = T_R_365.rank_365 and T_R.brand = T_R_365.brand
-order by brand, [Giá bán] desc
 
---4/ Các sản phẩm lọt vào top 5 doanh thu cả trong tổng số và trong 365 ngày gần nhất.
+/*--------------------------------------------------------------
+4/ Các sản phẩm lọt vào top 5 doanh thu cả tổng và 365 ngày gần nhất
+--------------------------------------------------------------*/
+WITH rank_Total_revenue AS (
+    SELECT 
+        Brand,
+        [Tên sản phẩm],
+        [Tổng doanh số],
+        [Tổng lượt bán],
+        [Giá bán],
+        DENSE_RANK() OVER (
+            PARTITION BY Brand 
+            ORDER BY [Tổng doanh số] DESC
+        ) AS rank_total
+    FROM dhfood
+),
+T_R AS (
+    SELECT *
+    FROM rank_Total_revenue
+    WHERE rank_total <= 5
+),
+rank_365_last AS (
+    SELECT 
+        Brand,
+        [Tên sản phẩm],
+        [Doanh số 365 ngày gần nhất],
+        [Sản phẩm đã bán trong khoảng 365 ngày gần nhất],
+        [Giá bán],
+        DENSE_RANK() OVER (
+            PARTITION BY Brand 
+            ORDER BY [Doanh số 365 ngày gần nhất] DESC
+        ) AS rank_365
+    FROM dhfood
+),
+T_R_365 AS (
+    SELECT *
+    FROM rank_365_last
+    WHERE rank_365 <= 5
+)
+SELECT 
+    T_R.Brand,
+    T_R.[Tên sản phẩm]  AS Tên_sản_phẩm_total,
+    T_R_365.[Tên sản phẩm] AS Tên_sản_phẩm_365,
+    T_R.[Giá bán]
+FROM T_R
+FULL JOIN T_R_365
+    ON  T_R.rank_total = T_R_365.rank_365
+    AND T_R.Brand = T_R_365.Brand
+WHERE T_R.[Tên sản phẩm] = T_R_365.[Tên sản phẩm]
+ORDER BY Brand, [Giá bán] DESC;
 
-with rank_Total_revenue as (Select 
-Brand,
-[Tên sản phẩm],
-[Tổng doanh số],
-[Tổng lượt bán],
-[Giá bán],
-dense_rank() over(partition by brand order by [Tổng doanh số] desc) as rank_total
-from dhfood),
-
-T_R as (select *
-from rank_Total_revenue
-where rank_total <= 5),
-
-rank_365_last as (Select 
-Brand,
-[Tên sản phẩm],
-[Doanh số 365 ngày gần nhất],
-[Sản phẩm đã bán trong khoảng 365 ngày gần nhất],
-[Giá bán],
-dense_rank() over(partition by brand order by [Doanh số 365 ngày gần nhất] desc) as rank_365
-from dhfood),
-
-T_R_365 as (select *
-from rank_365_last
-where rank_365 <= 5)
-
-select 
-T_R.brand,
-T_R.[Tên sản phẩm] as Tên_sản_phẩm_total,
-T_R_365.[Tên sản phẩm] as Tên_sản_phẩm_365,
-T_R.[Giá bán]
-from T_R
-full join T_R_365
-on T_R.rank_total = T_R_365.rank_365 and T_R.brand = T_R_365.brand
-Where T_R.[Tên sản phẩm] = T_R_365.[Tên sản phẩm]
-order by brand, [Giá bán] desc
-
---Nhận xét: Qua phân tích và so sánh, khoảng 7 sản phẩm liên tục duy trì vị trí trong top doanh thu, cho thấy đây là những sản phẩm tiêu dùng phổ biến và có sức hút mạnh mẽ. 
---Đề xuất xem xét kỹ lưỡng các sản phẩm này để lựa chọn nhập về kinh doanh.
-
+-- Nhận xét:
+-- Khoảng 7 sản phẩm liên tục duy trì vị trí top doanh thu, 
+-- cho thấy đây là nhóm hàng tiêu dùng phổ biến, sức hút mạnh. 
+-- Đề xuất: xem xét kỹ các sản phẩm này để nhập về kinh doanh.
